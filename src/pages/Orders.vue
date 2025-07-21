@@ -2,7 +2,21 @@
   <div>
     <h2>Gestion des commandes</h2>
 
-    <v-btn color="primary" class="my-4" @click="openDialog()">Créer une commande</v-btn>
+    <!-- Barre de recherche et bouton d'ajout -->
+    <v-row class="my-4">
+      <v-col cols="12" md="6">
+        <v-text-field
+          v-model="searchQuery"
+          label="Rechercher une commande..."
+          prepend-inner-icon="mdi-magnify"
+          clearable
+          outlined
+        ></v-text-field>
+      </v-col>
+      <v-col cols="12" md="6">
+        <v-btn color="primary" @click="openDialog()">Créer une commande</v-btn>
+      </v-col>
+    </v-row>
 
     <!-- Liste des commandes -->
     <v-table>
@@ -15,7 +29,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(order, index) in orders" :key="index">
+        <tr v-for="(order, index) in filteredOrders" :key="index">
           <td>{{ order.client }}</td>
           <td>
             <ul>
@@ -26,7 +40,7 @@
           </td>
           <td>{{ order.total.toFixed(2) }}</td>
           <td>
-            <v-btn icon color="red" @click="deleteOrder(index)">🗑️</v-btn>
+            <v-btn icon color="red" @click="deleteOrder(getOriginalIndex(order))">🗑️</v-btn>
           </td>
         </tr>
       </tbody>
@@ -50,13 +64,24 @@
 
           <div v-for="(article, index) in articles" :key="index" class="mb-2">
             <v-row>
-              <v-col cols="8">{{ article.name }} ({{ article.price }} €)</v-col>
-              <v-col cols="4">
+              <v-col cols="6">
+                <span>{{ article.name }} ({{ article.price }} €)</span>
+                <br>
+                <small :class="article.stock <= 5 ? 'text-red' : 'text-grey'">
+                  Stock: {{ article.stock }}
+                  <span v-if="article.stock <= 5" class="text-red font-weight-bold"> - Stock faible!</span>
+                </small>
+              </v-col>
+              <v-col cols="6">
                 <v-text-field
                   type="number"
                   min="0"
+                  :max="article.stock"
                   v-model.number="quantities[article.name]"
                   label="Qté"
+                  :disabled="article.stock === 0"
+                  :error="quantities[article.name] > article.stock"
+                  :error-messages="quantities[article.name] > article.stock ? 'Stock insuffisant' : ''"
                 ></v-text-field>
               </v-col>
             </v-row>
@@ -73,15 +98,36 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 
 // Données de base
 const users = ref([])
 const articles = ref([])
 const orders = ref([])
+const searchQuery = ref('')
 const dialog = ref(false)
 const newOrder = ref({ client: '', items: [], total: 0 })
 const quantities = ref({})
+
+// Commandes filtrées selon la recherche
+const filteredOrders = computed(() => {
+  if (!searchQuery.value) return orders.value
+  
+  const query = searchQuery.value.toLowerCase()
+  return orders.value.filter(order => 
+    order.client.toLowerCase().includes(query) ||
+    order.items.some(item => item.name.toLowerCase().includes(query))
+  )
+})
+
+// Fonction pour obtenir l'index original d'une commande filtrée
+function getOriginalIndex(order) {
+  return orders.value.findIndex(o => 
+    o.client === order.client && 
+    o.total === order.total && 
+    o.date === order.date
+  )
+}
 
 // Chargement des clients et articles depuis localStorage
 onMounted(() => {
@@ -120,17 +166,28 @@ function closeDialog() {
 function saveOrder() {
   const items = []
   let total = 0
+  let stockErrors = []
 
+  // Vérifier d'abord que tous les articles ont assez de stock
   for (const article of articles.value) {
     const qty = quantities.value[article.name]
     if (qty && qty > 0) {
-      items.push({
-        name: article.name,
-        quantity: qty,
-        price: article.price,
-      })
-      total += qty * article.price
+      if (qty > article.stock) {
+        stockErrors.push(`Stock insuffisant pour ${article.name} (disponible: ${article.stock}, demandé: ${qty})`)
+      } else {
+        items.push({
+          name: article.name,
+          quantity: qty,
+          price: article.price,
+        })
+        total += qty * article.price
+      }
     }
+  }
+
+  if (stockErrors.length > 0) {
+    alert('Erreurs de stock:\n' + stockErrors.join('\n'))
+    return
   }
 
   if (!newOrder.value.client || items.length === 0) {
@@ -138,11 +195,22 @@ function saveOrder() {
     return
   }
 
+  // Réduire le stock des articles commandés
+  for (const item of items) {
+    const article = articles.value.find(a => a.name === item.name)
+    if (article) {
+      article.stock -= item.quantity
+    }
+  }
+
+  // Sauvegarder les articles mis à jour
+  localStorage.setItem('articles', JSON.stringify(articles.value))
+
   orders.value.push({
     client: newOrder.value.client.name || newOrder.value.client,
     items,
     total,
-    date: new Date().toISOString(), // ✅ Ajout de la date ici
+    date: new Date().toISOString(),
   })
 
   saveToLocalStorage()
