@@ -1,3 +1,8 @@
+## Connexion :
+
+Nom d'utilisateur : admin
+mdp : 123456
+
 # Mini CRM – Vue 3 + Vite + Vuetify
 
 Ce projet est un mini-CRM développé avec Vue 3, Vite et Vuetify.  
