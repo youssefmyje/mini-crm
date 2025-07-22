@@ -2,10 +2,23 @@
   <div>
     <h2>Gestion des utilisateurs</h2>
 
-    <!-- Bouton d'ajout -->
-    <v-btn color="primary" class="my-4" @click="openDialog()">Ajouter un utilisateur</v-btn>
+    <!-- Barre de recherche des utilisateurs -->
+    <v-row class="my-4">
+      <v-col cols="12" md="6">
+        <v-text-field
+          v-model="searchQuery"
+          label="Rechercher un utilisateur..."
+          prepend-inner-icon="mdi-magnify"
+          clearable
+          outlined
+        ></v-text-field>
+      </v-col>
+      <v-col cols="12" md="6">
+        <v-btn color="primary" @click="openDialog()">Ajouter un utilisateur</v-btn>
+      </v-col>
+    </v-row>
 
-    <!-- Tableau d’utilisateurs -->
+    <!-- Tableau d'utilisateurs -->
     <v-table>
       <thead>
         <tr>
@@ -15,14 +28,14 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(user, index) in users" :key="index">
+        <tr v-for="(user, index) in filteredUsers" :key="index">
           <td>{{ user.name }}</td>
           <td>{{ user.email }}</td>
           <td>
-            <v-btn icon color="blue" @click="openDialog(user, index)">
+            <v-btn icon color="blue" @click="openDialog(user, getOriginalIndex(user))">
               ✏️
             </v-btn>
-            <v-btn icon color="red" @click="deleteUser(index)">
+            <v-btn icon color="red" @click="deleteUser(getOriginalIndex(user))">
               🗑️
             </v-btn>
           </td>
@@ -49,12 +62,29 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 
-
-
-// Liste d’utilisateurs (en mémoire)
+// Liste d'utilisateurs (en mémoire)
 const users = ref([])
+const searchQuery = ref('')
+
+// Utilisateurs filtrés selon la recherche
+const filteredUsers = computed(() => {
+  if (!searchQuery.value) return users.value
+  
+  const query = searchQuery.value.toLowerCase()
+  return users.value.filter(user => 
+    user.name.toLowerCase().includes(query) || 
+    user.email.toLowerCase().includes(query)
+  )
+})
+
+// Fonction pour obtenir l'index original d'un utilisateur filtré
+function getOriginalIndex(user) {
+  return users.value.findIndex(u => 
+    u.name === user.name && u.email === user.email
+  )
+}
 
 // Charger depuis localStorage au démarrage
 onMounted(() => {
@@ -64,11 +94,10 @@ onMounted(() => {
   }
 })
 
-
 // Formulaire utilisateur
 const form = ref({ name: '', email: '' })
 
-// État du dialog et de l’édition
+// État du dialog et de l'édition
 const dialog = ref(false)
 const editedIndex = ref(null)
 
@@ -87,7 +116,6 @@ function openDialog(user = null, index = null) {
 function saveToLocalStorage() {
   localStorage.setItem('users', JSON.stringify(users.value))
 }
-
 
 // Fermer le dialog
 function closeDialog() {
