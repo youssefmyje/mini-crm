@@ -1,4 +1,4 @@
-# Mini CRM – Vue 3 + Vite + Vuetify
+# Mini CRM – Vue 3 + Vite + Vuetify (Reda El Karne /Youssef myge /Souhail Cherfi/Abdulhamid Benkada)
 
 Ce projet est un mini-CRM développé avec Vue 3, Vite et Vuetify.  
 Il permet de gérer complètement une petite entreprise avec un système de gestion intégré.
